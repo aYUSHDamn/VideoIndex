@@ -1,109 +1,275 @@
-# DBMS Video Transcription Pipeline
+# 🎬 VideoIndex — Intelligent Video Library & Transcript Search
 
-A standalone Python + MySQL project. It has no FastAPI server or backend API.
+**Organize your videos. Explore their content. Find information faster.**
+
+VideoIndex is a full-stack video indexing application that organizes video metadata, stores records in a MySQL database, and uses AI-powered speech recognition to generate searchable transcripts. Its web interface provides a centralized library for browsing videos, exploring categories, and reading transcript content.
+
+---
+
+## ✨ Features
+
+- **📚 Centralized Video Library** — Browse video records through a clean, responsive dashboard.
+- **🔎 Search & Filtering** — Search video titles, descriptions, and transcripts, and filter videos by category.
+- **📝 AI-Powered Transcription** — Generate text transcripts from video audio using OpenAI Whisper.
+- **▶️ Video Playback** — Access and play locally stored video files through the application.
+- **🗃️ MySQL Database** — Store video metadata, categories, descriptions, languages, durations, views, and transcripts.
+- **⚡ REST API** — Retrieve video and category data through a FastAPI backend.
+- **🎨 Modern UI** — Dark-themed React interface with video cards, dashboard statistics, and transcript panels.
+- **🎵 Audio Extraction** — Use FFmpeg to extract audio from video files for transcription.
+
+## 🖥️ Preview
+
+The dashboard includes:
+
+- Total video and category counts
+- Video library with category filters
+- Search across metadata and transcripts
+- Video playback and transcript viewing
+- Database-backed video records
+
+> Add your actual application screenshot here to make the repository more visually engaging.
+
+## 🛠️ Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | React, Vite, JavaScript, CSS |
+| Backend | Python, FastAPI, Uvicorn |
+| Database | MySQL |
+| AI / Speech Recognition | OpenAI Whisper |
+| Media Processing | FFmpeg |
+| API Documentation | Swagger UI / OpenAPI |
+| Version Control | Git and GitHub |
+
+## 🏗️ Architecture
 
 ```text
-video file
-  -> ffprobe reads duration and optional title/description metadata
-  -> ffmpeg extracts mono, 16 kHz PCM WAV audio
-  -> Whisper transcribes the WAV
-  -> scikit-learn extracts transcript tags
-  -> Python writes video, transcript, metadata, and tags to MySQL
+                 ┌──────────────────────┐
+                 │   React + Vite UI    │
+                 │   localhost:5173     │
+                 └──────────┬───────────┘
+                            │ HTTP Requests
+                            ▼
+                 ┌──────────────────────┐
+                 │    FastAPI Backend   │
+                 │   localhost:8001     │
+                 └──────────┬───────────┘
+                            │
+                 ┌──────────┴───────────┐
+                 ▼                      ▼
+        ┌─────────────────┐    ┌─────────────────┐
+        │   MySQL Database│    │ Media Processing│
+        │ Metadata & Text │    │ FFmpeg + Whisper│
+        └─────────────────┘    └─────────────────┘
 ```
 
-Everything for this project lives in this folder. Put videos in `videos/`; extracted WAV files are written to `audios/`.
+## 📁 Project Structure
 
-## 1. Create the MySQL tables
+```text
+VideoIndex/
+├── app/
+│   ├── api.py              # FastAPI routes
+│   ├── database.py         # MySQL connection
+│   ├── import_videos.py    # Video indexing pipeline
+│   ├── media.py            # Audio extraction and transcription
+│   ├── settings.py         # Application settings
+│   └── tag_extraction.py   # Tag extraction utilities
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   │   ├── App.jsx         # Main React application
+│   │   ├── App.css         # Dashboard styling
+│   │   ├── index.css       # Global styles
+│   │   └── main.jsx        # Frontend entry point
+│   └── package.json
+├── videos/                 # Local video files
+├── audios/                 # Extracted audio files
+├── .env.example            # Environment configuration template
+├── requirements.txt        # Python dependencies
+├── schema.sql              # Database schema
+└── README.md
+```
 
-Open `schema.sql` in MySQL Workbench and execute the whole script. It creates the `video_index_db` schema and the tables in the attached ER diagram:
+## ⚙️ Getting Started
 
-- `users` → `channels` → `videos`
-- `categories` → `videos`
-- `videos` and `users` → `comments`
-- `users` and `videos` → `watch_history`
-- `videos` ↔ `tags` through `video_tags`
+### Prerequisites
 
-The `videos` table also has `video_path`, `audio_path`, and `transcript` fields for this pipeline. `duration` is an integer number of seconds.
+Install the following before running the application:
 
-To inspect imported rows in Workbench:
+- Python 3.12.4 or a compatible version
+- Node.js and npm
+- MySQL Server
+- FFmpeg
+- Git
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/aYUSHDamn/VideoIndex.git
+cd VideoIndex
+```
+
+### 2. Set up the Python environment
+
+```bash
+python -m venv .venv
+```
+
+Activate the environment on Windows:
+
+```cmd
+.venv\Scripts\activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure MySQL
+
+Start your MySQL server and create a database. Import the schema provided in `schema.sql` into the appropriate database.
+
+For example, using the MySQL command-line client:
+
+```bash
+mysql -u root -p
+```
+
+Then, inside MySQL:
 
 ```sql
-USE video_index_db;
-SELECT * FROM videos;
+CREATE DATABASE video_index;
+EXIT;
 ```
 
-To show readable transcript and tag data:
+Import the schema:
 
-```sql
-SELECT video_id, title, duration, language, description, transcript
-FROM videos;
-
-SELECT v.video_id, v.title, t.tag_name
-FROM videos AS v
-JOIN video_tags AS vt ON vt.video_id = v.video_id
-JOIN tags AS t ON t.tag_id = vt.tag_id
-ORDER BY v.video_id, t.tag_name;
+```cmd
+mysql -u root -p video_index < schema.sql
 ```
 
-To generate the ER diagram in Workbench, use **Database → Reverse Engineer**, connect to the same MySQL server, select `video_index_db`, and finish the wizard. The foreign keys in `schema.sql` define the relationships.
+**Configuration note:** Check `app/settings.py`, `app/database.py`, and `.env.example` for the exact database configuration keys expected by your version of the application.
 
-## 2. Configure MySQL
+Create your local `.env` from the provided template:
 
-From this folder, copy the template and edit it with your local MySQL connection details:
-
-```powershell
-Copy-Item .env.example .env
-notepad .env
+```cmd
+copy .env.example .env
 ```
 
-Set the host, database name, MySQL user, and password for your local MySQL server. `.env` is ignored by Git.
+Update `.env` with your local MySQL credentials and database settings. Never commit real credentials to GitHub.
 
-## 3. Install the Python dependencies
+### 4. Install FFmpeg
 
-Use the virtual environment created inside this folder:
+Install FFmpeg and ensure its `bin` directory is available in your Windows `PATH`.
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Verify the installation:
+
+```bash
+ffmpeg -version
 ```
 
-Install ffmpeg separately and make sure both `ffmpeg` and `ffprobe` are on `PATH`. Whisper's first run downloads its model; the default is `base`. Change `WHISPER_MODEL` in `.env` to another Whisper model name if needed.
+### 5. Start the backend
 
-## 4. Add videos and import them
+From the project root, run:
 
-Copy one or more video files into `videos/`, then run this from the `dbms` folder:
-
-```powershell
-.\.venv\Scripts\python.exe -m app.import_videos
+```bash
+python -m uvicorn app.api:app --host 127.0.0.1 --port 8001
 ```
 
-You can also process one file without copying it into the folder:
+The API will be available at:
 
-```powershell
-.\.venv\Scripts\python.exe -m app.import_videos --video ..\videos\videoSample4.mp4
+- API base URL: `http://127.0.0.1:8001`
+- Swagger documentation: `http://127.0.0.1:8001/docs`
+
+Keep the backend terminal running.
+
+### 6. Start the frontend
+
+Open a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-Or select a different input folder:
+Open the local URL printed by Vite, typically:
 
-```powershell
-.\.venv\Scripts\python.exe -m app.import_videos --input-dir D:\path\to\videos
+`http://localhost:5173`
+
+Ensure that the frontend API configuration points to the backend port `8001`:
+
+```javascript
+const API = "http://127.0.0.1:8001";
 ```
 
-To use the existing sample videos one level above this folder without copying them:
+### 7. Index videos and generate transcripts
 
-```powershell
-.\.venv\Scripts\python.exe -m app.import_videos --input-dir ..\videos
+Place supported video files in the local `videos/` directory, then run the indexing script from the project root:
+
+```bash
+python -m app.import_videos --input-dir videos
 ```
 
-The importer creates a `Local Video Importer` user, a `Local Video Imports` channel, and an `Uncategorized` category when they do not exist. It records a title from file metadata or detected transcript phrases, a description from file metadata or a transcript excerpt, language, duration, file paths, full transcript, and tag links. It skips video paths already present in MySQL so rerunning it does not duplicate rows.
+The transcription pipeline uses FFmpeg to extract audio and Whisper to generate transcripts. The first Whisper model download requires an internet connection and may take time.
 
-Tags use TF-IDF over the videos being imported, with likely repeated title phrases ranked first. Tag extraction is a lightweight keyword heuristic; Whisper transcription quality affects tag quality.
+Check `app/import_videos.py` for the exact supported arguments and import behavior.
 
-## Project files
+## 🔌 API Endpoints
 
-- `schema.sql` — MySQL schema and ER relationships.
-- `app/import_videos.py` — command-line pipeline and MySQL inserts.
-- `app/media.py` — ffprobe, ffmpeg audio extraction, and Whisper transcription.
-- `app/tag_extraction.py` — transcript-to-keyword extraction.
-- `app/database.py`, `app/settings.py` — MySQL connection and local settings.
-- `.env.example` — template for local MySQL and Whisper settings.
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/` | Check API status |
+| GET | `/api/videos` | Retrieve video records |
+| GET | `/api/categories` | Retrieve available categories |
+
+Interactive API documentation is available at `/docs` when the backend is running.
+
+## 🔍 How It Works
+
+1. **Indexing:** Video files are discovered by the indexing pipeline.
+2. **Audio extraction:** FFmpeg extracts audio for speech recognition.
+3. **Transcription:** Whisper converts speech into text.
+4. **Storage:** Video metadata and transcript information are stored in MySQL.
+5. **Retrieval:** FastAPI exposes video and category records through REST endpoints.
+6. **Discovery:** The React interface displays the library and lets users search metadata and transcript text.
+
+## 🔐 Configuration & Data
+
+- Keep `.env` and other secret files out of version control.
+- Do not commit private credentials, database dumps, or sensitive media.
+- Video and audio assets may need to be supplied separately when setting up the project on another machine.
+- Whisper models are downloaded and cached locally when required.
+- The current setup is designed for local development; public deployment requires suitable database and media hosting configuration.
+
+## 🚧 Future Enhancements
+
+Potential improvements include:
+
+- Timestamped transcripts with synchronized playback
+- Search results highlighting matching transcript passages
+- Automatic tagging and topic extraction
+- Video upload and metadata management
+- Transcript export and download
+- Authentication and user-specific libraries
+- Cloud deployment and scalable media storage
+
+## 🎯 Project Objective
+
+VideoIndex explores how a combination of database management, media processing, speech recognition, and full-stack web development can make video collections easier to organize and search.
+
+Rather than treating videos as isolated files, the project creates structured records enriched with textual information, enabling more useful content discovery.
+
+## 👨‍💻 Author
+
+**Ayush Konar**
+
+B.Tech — Computer Science and Engineering (Data Science)
+
+GitHub: [@aYUSHDamn](https://github.com/aYUSHDamn)
+
+---
+
+*Built with React, FastAPI, MySQL, FFmpeg, and Whisper.*
